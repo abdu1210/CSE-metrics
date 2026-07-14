@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSE Metrics Dashboard — Contentstack</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F5F4; --card:#FFFFFF; --border:#E5E4E2; --text:#1A1919; --sub:#5B5A58;
+  --am:#8A38F5; --am2:#899CFA; --grn:#3FAE58; --shade:#654A8C; --bshade:#525B89;
+  --ok:#1F8A46; --bad:#D33A3A; --warn:#B8860B;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);}
+header{padding:20px 28px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:10}
+header h1{margin:0;font-size:20px;font-weight:700}
+header .sub{color:var(--sub);font-size:13px;margin-top:2px}
+.banner{background:#FFF7E6;border:1px solid #F2C879;color:#7A5A00;font-size:12.5px;padding:8px 28px;line-height:1.5}
+.tabbar{display:flex;gap:4px;padding:0 28px;background:var(--card);border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{border:none;background:none;padding:14px 16px;font-family:inherit;font-size:13.5px;font-weight:600;color:var(--sub);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab.active{color:var(--am);border-bottom-color:var(--am)}
+main{padding:22px 28px 60px;max-width:1180px;margin:0 auto}
+.page{display:none}
+.page.active{display:block}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.toolbar .sub{color:var(--sub);font-size:13px}
+select, input.search{font-family:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(4,1fr)}
+.kpis5{grid-template-columns:repeat(5,1fr)}
+@media(max-width:900px){.kpis,.kpis5{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card.kpi .lab{font-size:11.5px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.card.kpi .val{font-size:26px;font-weight:700;margin-top:6px}
+.card.kpi .tag{font-size:12px;margin-top:4px;font-weight:600}
+.tag.ok{color:var(--ok)} .tag.bad{color:var(--bad)} .tag.warn{color:var(--warn)} .tag.neu{color:var(--sub)}
+.ch-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ch-title{font-size:14px;font-weight:700}
+.canwrap{height:280px}
+.small{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.5}
+.sect-h{margin:26px 0 10px}
+.sect-h h2{font-size:15px;margin:0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--sub);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.02em;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid #F0EFED}
+tr:hover td{background:#FAFAF9}
+.pill{padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600}
+.pill.good{background:#E7F6EA;color:var(--ok)}
+.pill.neu{background:#F0F0EE;color:var(--sub)}
+.pill.bad{background:#FBEAEA;color:var(--bad)}
+.pill.excl{background:#F0F0EE;color:#9A9998;text-decoration:line-through}
+a.rec{color:var(--am);text-decoration:none;font-weight:600}
+a.rec:hover{text-decoration:underline}
+.note{font-size:12px;color:var(--sub);background:#FAFAF9;border:1px dashed var(--border);border-radius:8px;padding:10px 12px;margin-top:10px}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.status-dot.live{background:var(--ok)}
+.status-dot.stale{background:var(--warn)}
+.footer{color:var(--sub);font-size:11.5px;padding:14px 28px;border-top:1px solid var(--border)}
+.overview-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+@media(max-width:1000px){.overview-grid{grid-template-columns:repeat(2,1fr)}}
+.ov-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+.ov-card .lab{font-size:11.5px;color:var(--sub);font-weight:600;text-transform:uppercase}
+.ov-card .val{font-size:22px;font-weight:700;margin-top:6px}
+.scroll{max-height:520px;overflow:auto;border:1px solid var(--border);border-radius:10px}
+.scroll table{margin:0}
+.scroll thead th{position:sticky;top:0;background:var(--card)}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <h1>CSE Metrics Dashboard</h1>
+      <div class="sub"><span class="status-dot stale" id="status-dot"></span><span id="status-text">Loading data source…</span></div>
+    </div>
+    <div id="auth-box"></div>
+  </div>
+</header>
+<div class="banner" id="mode-banner">This view shows the most recent verified pull from Salesforce (Feb 1 – Jul 16, 2026). Sign in with a Contentstack Google account above to switch to the live Google Drive snapshot, auto-refreshed every 5 minutes.</div>
+
+<div class="tabbar" id="tabbar">
+  <button class="tab active" data-p="p-overview">Overview</button>
+  <button class="tab" data-p="p-casecsat">Case CSAT</button>
+  <button class="tab" data-p="p-chatcsat">Chat CSAT</button>
+  <button class="tab" data-p="p-frt">FRT / SLA</button>
+  <button class="tab" data-p="p-closure">Closure Age (T1)</button>
+  <button class="tab" data-p="p-chatvol">Chat Volume</button>
+</div>
+
+<main>
+  <div class="page active" id="p-overview"></div>
+  <div class="page" id="p-casecsat"></div>
+  <div class="page" id="p-chatcsat"></div>
+  <div class="page" id="p-frt"></div>
+  <div class="page" id="p-closure"></div>
+  <div class="page" id="p-chatvol"></div>
+</main>
+<div class="footer">CSE Metrics Dashboard · Data pulled from Salesforce (Contentstack Survey Response, Case, CaseMilestone, MessagingSession) · Exclusions applied per the shared CSE leadership dashboard's exclusion list · Feb 1 – Jul 16, 2026 (FY26-27 YTD)</div>
+
+<script>
+/* ============================================================
+   BASELINE DATA — verified pull, Feb 1 2026 00:00 UTC to Jul 16 2026 00:00 UTC.
+   This is used whenever a live snapshot (Drive) isn't reachable.
+   ============================================================ */
+const SF_BASE = 'https://contentstack.my.salesforce.com/';
+let PULLED_AT = '2026-07-15T00:00:00Z';
+
+const CASE_CSAT_TARGET = 4.6, CHAT_CSAT_TARGET = 4.75, CLOSURE_AVG_GOAL = 4.0, CLOSURE_P75_TARGET = 6.48;
+
+/* One-time setup: paste the Google OAuth Client ID here once created (see GOOGLE_OAUTH_SETUP.md).
+   Until then this stays blank and the dashboard behaves exactly as it does today — baseline data only. */
+const CONFIG = {
+  GOOGLE_CLIENT_ID: '',
+  DRIVE_FOLDER_ID: '1SXWLtLZTueDDwHovpAde6Ijs4tkryBKe',
+  SNAPSHOT_NAME_PREFIX: 'cse_dashboard_metrics_snapshot_',
+  DRIVE_SCOPE: 'https://www.googleapis.com/auth/drive.readonly',
+  REFRESH_MS: 5 * 60 * 1000
+};
+
+let CASE_CSAT_MONTHLY = [
+  {m:'Feb',n:12,avg:4.33},{m:'Mar',n:10,avg:4.80},{m:'Apr',n:14,avg:4.50},
+  {m:'May',n:10,avg:4.80},{m:'Jun',n:7,avg:4.71},{m:'Jul',n:8,avg:4.63}
+];
+let CASE_CSAT_OVERALL = {n:61, avg:4.61, dsat:3};
+
+let CHAT_CSAT_MONTHLY = [
+  {m:'Feb',n:34,avg:4.74},{m:'Mar',n:14,avg:4.86},{m:'Apr',n:1,avg:4.00},
+  {m:'May',n:57,avg:4.77},{m:'Jun',n:48,avg:4.54},{m:'Jul',n:19,avg:4.63}
+];
+let CHAT_CSAT_OVERALL = {n:173, avg:4.69, dsat:4};
+
+let FRT_MONTHLY = [
+  {m:'Feb',total:516,violated:1},{m:'Mar',total:505,violated:0},{m:'Apr',total:473,violated:0},
+  {m:'May',total:512,violated:1},{m:'Jun',total:497,violated:0},{m:'Jul',total:230,violated:1}
+];
+let FRT_OVERALL = {total:2733, violated:3};
+
+let CLOSURE_MONTHLY = [
+  {m:'Feb',n:249,avg:4.21},{m:'Mar',n:303,avg:5.30},{m:'Apr',n:278,avg:4.70},
+  {m:'May',n:292,avg:4.09},{m:'Jun',n:330,avg:4.88},{m:'Jul',n:117,avg:3.93}
+];
+let CLOSURE_OVERALL = {n:1569, avg:4.61, p50:4, p75:7, p95:13};
+let CLOSURE_BUCKETS = [
+  {name:'0',count:215,avg:0.00},
+  {name:'1-2',count:371,avg:1.44},
+  {name:'3-5',count:444,avg:4.04},
+  {name:'6-8',count:325,avg:6.75},
+  {name:'9-12',count:135,avg:10.37},
+  {name:'>12',count:79,avg:17.00}
+];
+
+let CHAT_VOL_MONTHLY = [
+  {m:'Feb',total:191,converted:69},{m:'Mar',total:329,converted:96},{m:'Apr',total:320,converted:111},
+  {m:'May',total:366,converted:144},{m:'Jun',total:346,converted:137},{m:'Jul',total:174,converted:65}
+];
+let CHAT_VOL_OVERALL = {total:1726, converted:622};
+
+/* Ticket-level rows. "excluded" rows are kept visible but flagged (never hidden), matching
+   how the CSE leadership Cowork artifact treats deselected/invalid DSATs and SLA breaches. */
+let CASE_CSAT_ROWS = [
+["Feb",'2026-02-02',"00053101","500Uc00000vwoy9IAA","Satisfied",false],
+["Feb",'2026-02-02',"00053117","500Uc00000vxfSzIAI","Satisfied",false],
+["Feb",'2026-02-04',"00053310","500Uc00000wKVO9IAO","Very Satisfied",false],
+["Feb",'2026-02-09',"00053415","500Uc00000wWBbgIAG","Very Satisfied",false],
+["Feb",'2026-02-10',"00053218","500Uc00000w9oYtIAI","Very Dissatisfied",false],
+["Feb",'2026-02-11',"00053485","500Uc00000wkLUfIAM","Very Satisfied",false],
+["Feb",'2026-02-16',"00053562","500Uc00000wu2qXIAQ","Satisfied",false],
+["Feb",'2026-02-17',"00053121","500Uc00000vxuWqIAI","Very Satisfied",false],
+["Feb",'2026-02-20',"00053815","500Uc00000xRtjBIAS","Very Satisfied",false],
+["Feb",'2026-02-25',"00053972","500Uc00000xriQkIAI","Very Satisfied",false],
+["Feb",'2026-02-25',"00053970","500Uc00000xqexMIAQ","Very Satisfied",false],
+["Feb",'2026-02-27',"00053927","500Uc00000xlt43IAA","Satisfied",false],
+["Mar",'2026-03-04',"00053204","500Uc00000w7QECIA2","Very Satisfied",false],
+["Mar",'2026-03-06',"00056151","500Uc00000yUXlcIAG","Very Satisfied",false],
+["Mar",'2026-03-16',"00056240","500Uc00000yjbbxIAA","Very Satisfied",false],
+["Mar",'2026-03-16',"00056329","500Uc00000ytenDIAQ","Very Satisfied",false],
+["Mar",'2026-03-17',"00056394","500Uc00000z5iN3IAI","Satisfied",false],
+["Mar",'2026-03-18',"00056231","500Uc00000yjKODIA2","Satisfied",false],
+["Mar",'2026-03-18',"00056438","500Uc00000z9tADIAY","Very Satisfied",false],
+["Mar",'2026-03-18',"00053928","500Uc00000xmXnkIAE","Very Satisfied",false],
+["Mar",'2026-03-23',"00056230","500Uc00000yjBuPIAU","Dissatisfied",true],
+["Mar",'2026-03-24',"00056381","500Uc00000z3bSyIAI","Very Satisfied",false],
+["Mar",'2026-03-30',"00056845","500Uc00000zqxnGIAQ","Very Satisfied",false],
+["Apr",'2026-04-03',"00056500","500Uc00000zGNf6IAG","Very Satisfied",false],
+["Apr",'2026-04-10',"00056609","500Uc00000zZJfmIAG","Very Satisfied",false],
+["Apr",'2026-04-10',"00057024","500Uc000010K3PUIA0","Very Satisfied",false],
+["Apr",'2026-04-13',"00052181","500Uc00000twaYAIAY","Very Dissatisfied",false],
+["Apr",'2026-04-22',"00057508","500Uc000011HcUQIA0","Very Satisfied",false],
+["Apr",'2026-04-22',"00057269","500Uc000010pKsDIAU","Very Satisfied",false],
+["Apr",'2026-04-22',"00057464","500Uc000011CMwbIAG","Very Satisfied",false],
+["Apr",'2026-04-23',"00057333","500Uc000010yXaAIAU","Very Satisfied",false],
+["Apr",'2026-04-23',"—","","Very Satisfied",false],
+["Apr",'2026-04-23',"00057042","500Uc000010M38QIAS","Very Satisfied",false],
+["Apr",'2026-04-28',"00057662","500Uc000011SvnBIAS","Very Satisfied",false],
+["Apr",'2026-04-28',"00056589","500Uc00000zW5EOIA0","Very Satisfied",false],
+["Apr",'2026-04-28',"00020861","5008W00000q8fIbQAI","Neutral",false],
+["Apr",'2026-04-30',"00057068","500Uc000010PJrpIAG","Satisfied",false],
+["May",'2026-05-01',"00057682","500Uc000011VAbdIAG","Very Satisfied",false],
+["May",'2026-05-06',"00058080","500Uc0000126J6lIAE","Very Satisfied",false],
+["May",'2026-05-12',"00058365","500Uc000012RjFhIAK","Very Satisfied",false],
+["May",'2026-05-17',"00058220","500Uc000012LgAkIAK","Very Satisfied",false],
+["May",'2026-05-18',"00058504","500Uc000012ewTXIAY","Very Satisfied",false],
+["May",'2026-05-19',"00058417","500Uc000012WcZyIAK","Very Satisfied",false],
+["May",'2026-05-20',"00058495","500Uc000012eBPxIAM","Very Satisfied",false],
+["May",'2026-05-22',"00058646","500Uc000012vLFqIAM","Very Satisfied",false],
+["May",'2026-05-22',"00058408","500Uc000012VY8fIAG","Satisfied",false],
+["May",'2026-05-26',"00058415","500Uc000012W5aqIAC","Satisfied",false],
+["Jun",'2026-06-01',"00058692","500Uc0000132wP8IAI","Very Satisfied",false],
+["Jun",'2026-06-04',"00058402","500Uc000012VB3yIAG","Satisfied",false],
+["Jun",'2026-06-08',"00059032","500Uc000013fuIYIAY","Satisfied",false],
+["Jun",'2026-06-16',"00058861","500Uc000013NYBfIAO","Very Dissatisfied",true],
+["Jun",'2026-06-16',"00035931","500Uc00000KTcuUIAT","Very Dissatisfied",true],
+["Jun",'2026-06-18',"00059477","500Uc000014bUHFIA2","Very Satisfied",false],
+["Jun",'2026-06-22',"00059491","500Uc000014cpxxIAA","Very Dissatisfied",true],
+["Jun",'2026-06-22',"00059461","500Uc000014XkJ0IAK","Very Satisfied",false],
+["Jun",'2026-06-23',"00059617","500Uc000014xS2HIAU","Very Satisfied",false],
+["Jun",'2026-06-26',"00059733","500Uc000015FwDDIA0","Very Satisfied",false],
+["Jul",'2026-07-01',"00059822","500Uc000015VD46IAG","Very Satisfied",false],
+["Jul",'2026-07-01',"00059827","500Uc000015Wcd3IAC","Very Satisfied",false],
+["Jul",'2026-07-02',"00059854","500Uc000015ZzKMIA0","Very Satisfied",false],
+["Jul",'2026-07-03',"00059552","500Uc000014kgzBIAQ","Very Satisfied",false],
+["Jul",'2026-07-03',"00059814","500Uc000015U5GcIAK","Very Satisfied",false],
+["Jul",'2026-07-10',"00059892","500Uc000015hFZwIAM","Dissatisfied",false],
+["Jul",'2026-07-13',"00059897","500Uc000015hrosIAA","Very Satisfied",false],
+["Jul",'2026-07-14',"00060216","500Uc000016L8t3IAC","Very Satisfied",false]
+];
+
+/* Chat CSAT ticket rows: Feb-Apr is a complete, verified pull (53 responses).
+   May-Jul rows aren't individually listed yet (that raw pull exceeded a size limit) —
+   the May/Jun/Jul KPI figures above are still exact, from a separate aggregate query. */
+let CHAT_CSAT_ROWS = [
+["Feb",'2026-02-05',"—","","5",false],
+["Feb",'2026-02-06',"—","","5",false],
+["Feb",'2026-02-09',"—","","5",false],
+["Feb",'2026-02-12',"—","","5",false],
+["Feb",'2026-02-12',"MS-00000019","0MwUc00000IGyVhKAL","4",false],
+["Feb",'2026-02-13',"MS-00000031","0MwUc00000IKClpKAH","5",false],
+["Feb",'2026-02-13',"MS-00000041","0MwUc00000IKRjMKAX","5",false],
+["Feb",'2026-02-13',"MS-00000044","0MwUc00000IKPmVKAX","4",false],
+["Feb",'2026-02-13',"MS-00000047","0MwUc00000ILDRKKA5","5",false],
+["Feb",'2026-02-13',"MS-00000048","0MwUc00000IKxY1KAL","5",false],
+["Feb",'2026-02-16',"MS-00000056","0MwUc00000IRTpyKAH","5",false],
+["Feb",'2026-02-16',"MS-00000060","0MwUc00000IRmz3KAD","5",false],
+["Feb",'2026-02-17',"MS-00000066","0MwUc00000ITvgUKAT","5",false],
+["Feb",'2026-02-17',"MS-00000074","0MwUc00000IUTmzKAH","5",false],
+["Feb",'2026-02-17',"MS-00000080","0MwUc00000IUeyZKAT","4",false],
+["Feb",'2026-02-17',"MS-00000085","0MwUc00000IVE9BKAX","5",false],
+["Feb",'2026-02-19',"MS-00000114","0MwUc00000IcH0mKAF","4",false],
+["Feb",'2026-02-19',"MS-00000115","0MwUc00000IcWm7KAF","2",true],
+["Feb",'2026-02-19',"MS-00000119","0MwUc00000IcdNmKAJ","4",false],
+["Feb",'2026-02-19',"—","","5",false],
+["Feb",'2026-02-19',"MS-00000128","0MwUc00000IeEzZKAV","5",false],
+["Feb",'2026-02-20',"MS-00000137","0MwUc00000IgCgkKAF","4",false],
+["Feb",'2026-02-21',"MS-00000140","0MwUc00000IjWKkKAN","5",false],
+["Feb",'2026-02-23',"MS-00000151","0MwUc00000IpBLjKAN","5",false],
+["Feb",'2026-02-24',"MS-00000160","0MwUc00000IrAjqKAF","5",false],
+["Feb",'2026-02-24',"MS-00000162","0MwUc00000IrKJBKA3","5",false],
+["Feb",'2026-02-24',"MS-00000164","0MwUc00000Is6njKAB","3",false],
+["Feb",'2026-02-25',"MS-00000176","0MwUc00000IuzWIKAZ","5",false],
+["Feb",'2026-02-25',"MS-00000177","0MwUc00000Iv55XKAR","1",true],
+["Feb",'2026-02-25',"MS-00000178","0MwUc00000IvVvxKAF","5",false],
+["Feb",'2026-02-26',"MS-00000186","0MwUc00000IxXDhKAN","5",false],
+["Feb",'2026-02-26',"MS-00000187","0MwUc00000IxUUMKA3","4",false],
+["Feb",'2026-02-26',"MS-00000192","0MwUc00000Ixz3VKAR","5",false],
+["Feb",'2026-02-26',"MS-00000203","0MwUc00000IyXWcKAN","5",false],
+["Feb",'2026-02-27',"MS-00000207","0MwUc00000J0EUfKAN","5",false],
+["Feb",'2026-02-27',"MS-00000208","0MwUc00000J0JXZKA3","5",false],
+["Mar",'2026-03-02',"MS-00000218","0MwUc00000J5A0bKAF","5",false],
+["Mar",'2026-03-02',"MS-00000224","0MwUc00000J6t6vKAB","3",false],
+["Mar",'2026-03-03',"MS-00000225","0MwUc00000J7O98KAF","5",false],
+["Mar",'2026-03-04',"MS-00000257","0MwUc00000JAnfdKAD","5",false],
+["Mar",'2026-03-05',"MS-00000259","0MwUc00000JB6DdKAL","5",false],
+["Mar",'2026-03-06',"MS-00000286","0MwUc00000JHpzGKAT","5",false],
+["Mar",'2026-03-10',"MS-00000295","0MwUc00000JRdlWKAT","5",false],
+["Mar",'2026-03-10',"MS-00000300","0MwUc00000JS6qpKAD","1",true],
+["Mar",'2026-03-10',"MS-00000299","0MwUc00000JSIOrKAP","5",false],
+["Mar",'2026-03-10',"MS-00000302","0MwUc00000JS33LKAT","5",false],
+["Mar",'2026-03-10',"MS-00000303","0MwUc00000JSLcrKAH","5",false],
+["Mar",'2026-03-10',"MS-00000301","0MwUc00000JSKAXKA5","1",true],
+["Mar",'2026-03-11',"MS-00000309","0MwUc00000JU9CcKAL","5",false],
+["Mar",'2026-03-11',"MS-00000311","0MwUc00000JUjSzKAL","5",false],
+["Mar",'2026-03-12',"MS-00000326","0MwUc00000JZdLKKA1","5",false],
+["Mar",'2026-03-13',"MS-00000331","0MwUc00000Jawk6KAB","5",false],
+["Apr",'2026-04-30',"MS-00000863","0MwUc00000M3COFKA3","4",false]
+];
+
+/* FRT/SLA — complete verified violated-milestone list (Feb 1 – Jul 16). Non-violated
+   milestones are not itemized here (2,733 total across the period) — only the 10 that
+   breached First Response SLA are, since those are the only ones exclusion applies to. */
+let FRT_VIOLATIONS = [
+["Feb",'2026-02-10',"00053547","500Uc00000wq6zMIAQ","Action","First Response SLA - P3",true],
+["Feb",'2026-02-26',"00054043","500Uc00000xyXbqIAE","Oncourse Home Solutions","First Response SLA - P3",false],
+["Mar",'2026-03-30',"00056831","500Uc00000zqKR3IAM","Action","First Response SLA - P3",true],
+["Apr",'2026-04-08',"00057081","500Uc000010Qem5IAC","Air France - KLM","First Response SLA - P3",true],
+["May",'2026-05-21',"00058708","500Uc0000134EF3IAM","Miele","First Response SLA - P3",false],
+["May",'2026-05-22',"00058741","500Uc0000137UlbIAE","Time Inc.","First Response SLA - P3",true],
+["May",'2026-05-27',"00058885","500Uc000013OmkcIAC","Alimentation Couche-Tard (Circle K)","First Response SLA - P2",true],
+["Jun",'2026-06-23',"00059661","500Uc00001546Y6IAI","Contentstack Inc","First Response SLA - P3",true],
+["Jul",'2026-07-01',"00059834","500Uc000015Xk7AIAS","Contentstack Inc","First Response SLA - P4",true],
+["Jul",'2026-07-13',"00060173","500Uc000016HWHGIA4","Michaels Stores","First Response SLA - P3",false]
+];
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function r2(x){ return x==null||isNaN(x) ? null : Math.round(x*100)/100; }
+function esc(s){ return (s+'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+function fmtDate(iso){ const d=new Date(iso); return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}); }
+const MONTHS = ['Feb','Mar','Apr','May','Jun','Jul'];
+let ACTIVE_MONTH = { casecsat:'All', chatcsat:'All', frt:'All', closure:'All', chatvol:'All' };
+const CHARTS = {};
+
+function monthSelect(key, onchange){
+  const opts = ['All'].concat(MONTHS).map(m=>`<option value="${m}">${m==='All'?'All months':m+' 2026'}</option>`).join('');
+  return `<select data-monthsel="${key}">${opts}</select>`;
+}
+function wireMonthSelect(containerEl, key, cb){
+  const sel = containerEl.querySelector(`select[data-monthsel="${key}"]`);
+  if(!sel) return;
+  sel.value = ACTIVE_MONTH[key];
+  sel.onchange = ()=>{ ACTIVE_MONTH[key]=sel.value; cb(); };
+}
+
+const CHART_FONT = {family:"'Inter',sans-serif", size:11};
+const COMMON_OPTS = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{
+    legend:{position:'bottom', labels:{color:'#5B5A58', font:CHART_FONT, boxWidth:12, usePointStyle:true}},
+    tooltip:{backgroundColor:'#1A1919', titleColor:'#F5F5F4', bodyColor:'#F5F5F4', borderColor:'#393838', borderWidth:1, padding:10}
+  },
+  scales:{
+    x:{ticks:{color:'#888', font:CHART_FONT}, grid:{color:'rgba(0,0,0,.06)'}},
+    y:{ticks:{color:'#888', font:CHART_FONT}, grid:{color:'rgba(0,0,0,.06)'}, beginAtZero:true}
+  }
+};
+
+/* ============================================================
+   OVERVIEW
+   ============================================================ */
+function renderOverview(){
+  const el = document.getElementById('p-overview');
+  const caseOk = CASE_CSAT_OVERALL.avg >= CASE_CSAT_TARGET;
+  const chatOk = CHAT_CSAT_OVERALL.avg >= CHAT_CSAT_TARGET;
+  const slaPct = r2((FRT_OVERALL.total-FRT_OVERALL.violated)/FRT_OVERALL.total*100);
+  const closureOk = CLOSURE_OVERALL.avg <= CLOSURE_AVG_GOAL;
+  const solvedPct = r2((CHAT_VOL_OVERALL.total-CHAT_VOL_OVERALL.converted)/CHAT_VOL_OVERALL.total*100);
+  el.innerHTML = `
+    <div class="toolbar"><div><div class="ch-title">Current status — FY26-27 YTD (Feb 1 – Jul 16, 2026)</div>
+    <div class="sub">All figures below have exclusions applied (invalid DSATs / SLA breaches removed).</div></div></div>
+    <div class="overview-grid">
+      <div class="ov-card"><div class="lab">Case CSAT</div><div class="val" style="color:${caseOk?'var(--ok)':'var(--bad)'}">${CASE_CSAT_OVERALL.avg.toFixed(2)}</div><div class="small">target ${CASE_CSAT_TARGET} · ${CASE_CSAT_OVERALL.n} responses</div></div>
+      <div class="ov-card"><div class="lab">Chat CSAT</div><div class="val" style="color:${chatOk?'var(--ok)':'var(--bad)'}">${CHAT_CSAT_OVERALL.avg.toFixed(2)}</div><div class="small">target ${CHAT_CSAT_TARGET} · ${CHAT_CSAT_OVERALL.n} responses</div></div>
+      <div class="ov-card"><div class="lab">FRT / SLA</div><div class="val" style="color:${slaPct>=99?'var(--ok)':'var(--warn)'}">${slaPct}%</div><div class="small">${FRT_OVERALL.violated} breach${FRT_OVERALL.violated===1?'':'es'} of ${FRT_OVERALL.total}</div></div>
+      <div class="ov-card"><div class="lab">Closure Age (T1)</div><div class="val" style="color:${closureOk?'var(--ok)':'var(--bad)'}">${CLOSURE_OVERALL.avg.toFixed(2)}d</div><div class="small">goal ≤${CLOSURE_AVG_GOAL}d · ${CLOSURE_OVERALL.n} cases</div></div>
+      <div class="ov-card"><div class="lab">Chats Solved w/o Case</div><div class="val">${solvedPct}%</div><div class="small">${CHAT_VOL_OVERALL.total} chats total</div></div>
+    </div>
+    <div class="sect-h"><h2>What needs attention</h2></div>
+    <div class="card">
+      <ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.9">
+        <li>Case CSAT is <b>${caseOk?'at or above':'below'}</b> the ${CASE_CSAT_TARGET} target (currently ${CASE_CSAT_OVERALL.avg.toFixed(2)}) with ${CASE_CSAT_OVERALL.dsat} counted DSAT${CASE_CSAT_OVERALL.dsat===1?'':'s'} after exclusions.</li>
+        <li>Chat CSAT is <b>${chatOk?'at or above':'below'}</b> the ${CHAT_CSAT_TARGET} target (currently ${CHAT_CSAT_OVERALL.avg.toFixed(2)}) with ${CHAT_CSAT_OVERALL.dsat} counted DSAT${CHAT_CSAT_OVERALL.dsat===1?'':'s'} after exclusions.</li>
+        <li>First Response SLA is holding at ${slaPct}% — ${FRT_OVERALL.violated} valid breach${FRT_OVERALL.violated===1?'':'es'} out of ${FRT_OVERALL.total} milestones tracked.</li>
+        <li>Tier‑1 closure age is running at ${CLOSURE_OVERALL.avg.toFixed(2)} days average (goal ≤${CLOSURE_AVG_GOAL}), P75 ≈${CLOSURE_OVERALL.p75}d (target ≤${CLOSURE_P75_TARGET}d).</li>
+      </ul>
+    </div>
+  `;
+}
+
+/* ============================================================
+   CASE CSAT / CHAT CSAT (shared renderer)
+   ============================================================ */
+function renderCsatTab(containerId, opts){
+  const el = document.getElementById(containerId);
+  const key = opts.key;
+  el.innerHTML = `
+    <div class="toolbar">
+      <div><div class="ch-title">${opts.title}</div><div class="sub">FY26-27 YTD · target ${opts.target}</div></div>
+      <div>${monthSelect(key)}</div>
+    </div>
+    <div id="${containerId}-kpis"></div>
+    <div class="card" style="margin-top:14px">
+      <div class="ch-head"><div class="ch-title">Monthly trend</div></div>
+      <div class="canwrap"><canvas id="${containerId}-chart"></canvas></div>
+      <div class="small">Monthly buckets (no weekly gaps) so every month shows a real value — a flat bucket means genuinely low volume that month, not a data gap.</div>
+    </div>
+    <div class="sect-h"><h2>Responses ${opts.rows === CHAT_CSAT_ROWS ? '(click a chat # to open the record in Salesforce)' : '(click a case # to open it in Salesforce)'}</h2></div>
+    <div class="scroll"><table><thead><tr><th>Month</th><th>Date</th><th>${opts.numLabel}</th><th>Response</th><th>Status</th></tr></thead>
+    <tbody id="${containerId}-tbody"></tbody></table></div>
+    ${opts.rowNote?`<div class="note">${opts.rowNote}</div>`:''}
+  `;
+  wireMonthSelect(el, key, ()=>renderCsatTab(containerId, opts));
+
+  const filtered = opts.rows.filter(r=>ACTIVE_MONTH[key]==='All' || r[0]===ACTIVE_MONTH[key]);
+  const scored = filtered.map(r=>{
+    const label = r[4];
+    const num = isNaN(Number(label)) ? label : Number(label);
+    const isNum = typeof num === 'number';
+    const score = isNum ? num : opts.satScore[label];
+    const isDsat = isNum ? score<=2 : (label==='Dissatisfied'||label==='Very Dissatisfied');
+    const arr = r.slice(); // keep it a real array (destructurable) and just attach extra fields
+    arr.score = score; arr.isDsat = isDsat;
+    return arr;
+  });
+  const active = scored.filter(r=>!r[5]); // r[5] = excluded flag
+  const n = active.length;
+  const avg = n? active.reduce((s,r)=>s+r.score,0)/n : null;
+  const dsatN = active.filter(r=>r.isDsat).length;
+
+  document.getElementById(containerId+'-kpis').innerHTML = `
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">${opts.scoreLabel}</div><div class="val">${avg!=null?avg.toFixed(2):'—'}</div>
+        <div class="tag ${avg!=null&&avg>=opts.target?'ok':'bad'}">${avg!=null?(avg>=opts.target?'✓ at/above target':'▲ below target'):''}</div></div>
+      <div class="card kpi"><div class="lab">Responses (after exclusions)</div><div class="val">${n}</div><div class="tag neu">${ACTIVE_MONTH[key]==='All'?'FY26-27 YTD':ACTIVE_MONTH[key]+' 2026'}</div></div>
+      <div class="card kpi"><div class="lab">DSAT count</div><div class="val">${dsatN}</div><div class="tag ${dsatN?'bad':'ok'}">${dsatN?'needs review':'none'}</div></div>
+      <div class="card kpi"><div class="lab">Excluded (invalid)</div><div class="val">${scored.length-n}</div><div class="tag neu">flagged, not counted</div></div>
+    </div>
+  `;
+
+  const monthly = opts.monthly;
+  const labels = monthly.map(x=>x.m);
+  if(CHARTS[containerId]) CHARTS[containerId].destroy();
+  CHARTS[containerId] = new Chart(document.getElementById(containerId+'-chart'), {
+    type:'line',
+    data:{labels, datasets:[
+      {label:opts.scoreLabel, data:monthly.map(x=>x.avg), borderColor:'#8A38F5', backgroundColor:'#8A38F5', borderWidth:3, pointRadius:4, pointHoverRadius:6, tension:.3, fill:false},
+      {label:'Target '+opts.target, data:monthly.map(()=>opts.target), borderColor:'#899CFA', borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false}
+    ]},
+    options:{...COMMON_OPTS, scales:{...COMMON_OPTS.scales, y:{...COMMON_OPTS.scales.y, min:Math.max(1,Math.min(...monthly.map(x=>x.avg))-0.6), max:5.3}}}
+  });
+
+  document.getElementById(containerId+'-tbody').innerHTML = scored.map(r=>{
+    const [month,date,num,recId,label,excluded] = r;
+    const link = recId ? `<a class="rec" target="_blank" rel="noopener" href="${SF_BASE}${recId}">${esc(num)}</a>` : esc(num);
+    const isNum = !isNaN(Number(label));
+    const pillClass = excluded ? 'excl' : ((isNum? Number(label)<=2 : (label==='Dissatisfied'||label==='Very Dissatisfied')) ? 'bad' : (label==='Neutral'||label==='3')? 'neu':'good');
+    const dispVal = isNum ? label+' ★' : label;
+    return `<tr><td>${month}</td><td>${fmtDate(date)}</td><td>${link}</td><td><span class="pill ${pillClass}">${esc(dispVal)}</span></td><td>${excluded?'<span class="small">Excluded (invalid)</span>':'Counted'}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="small">No responses this month.</td></tr>';
+}
+
+/* ============================================================
+   FRT / SLA
+   ============================================================ */
+function renderFrt(){
+  const el = document.getElementById('p-frt');
+  el.innerHTML = `
+    <div class="toolbar">
+      <div><div class="ch-title">First Response SLA</div><div class="sub">FY26-27 YTD · all tiers</div></div>
+      <div>${monthSelect('frt')}</div>
+    </div>
+    <div id="frt-kpis"></div>
+    <div class="card" style="margin-top:14px">
+      <div class="ch-head"><div class="ch-title">Monthly SLA %</div></div>
+      <div class="canwrap"><canvas id="frt-chart"></canvas></div>
+      <div class="small">SLA % = (milestones met) ÷ (total First Response milestones) per month, with excluded/invalid breaches added back as "met."</div>
+    </div>
+    <div class="sect-h"><h2>SLA breaches (click a case # to open it in Salesforce)</h2></div>
+    <div class="scroll"><table><thead><tr><th>Month</th><th>Date</th><th>Case #</th><th>Account</th><th>Milestone</th><th>Status</th></tr></thead>
+    <tbody id="frt-tbody"></tbody></table></div>
+    <div class="note">Only breached (violated) milestones are itemized here — the ${FRT_OVERALL.total.toLocaleString()} on-time milestones this period aren't listed individually.</div>
+  `;
+  wireMonthSelect(el, 'frt', renderFrt);
+
+  const monthly = FRT_MONTHLY;
+  const rows = FRT_VIOLATIONS.filter(r=>ACTIVE_MONTH.frt==='All' || r[0]===ACTIVE_MONTH.frt);
+  const scopeMonthly = ACTIVE_MONTH.frt==='All' ? monthly : monthly.filter(x=>x.m===ACTIVE_MONTH.frt);
+  const total = scopeMonthly.reduce((s,x)=>s+x.total,0);
+  const violatedRaw = scopeMonthly.reduce((s,x)=>s+x.violated,0);
+  const excludedCount = rows.filter(r=>r[6]).length;
+  const violatedCounted = rows.filter(r=>!r[6]).length;
+  const slaPct = total ? r2((total-violatedCounted)/total*100) : null;
+
+  document.getElementById('frt-kpis').innerHTML = `
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">SLA %</div><div class="val">${slaPct!=null?slaPct+'%':'—'}</div><div class="tag ${slaPct>=99.5?'ok':'warn'}">${ACTIVE_MONTH.frt==='All'?'FY26-27 YTD':ACTIVE_MONTH.frt+' 2026'}</div></div>
+      <div class="card kpi"><div class="lab">Milestones tracked</div><div class="val">${total.toLocaleString()}</div><div class="tag neu">First Response</div></div>
+      <div class="card kpi"><div class="lab">Valid breaches</div><div class="val">${violatedCounted}</div><div class="tag ${violatedCounted?'bad':'ok'}">counted</div></div>
+      <div class="card kpi"><div class="lab">Excluded (invalid)</div><div class="val">${excludedCount}</div><div class="tag neu">flagged, not counted</div></div>
+    </div>
+  `;
+
+  if(CHARTS.frt) CHARTS.frt.destroy();
+  CHARTS.frt = new Chart(document.getElementById('frt-chart'), {
+    type:'bar',
+    data:{labels:monthly.map(x=>x.m), datasets:[
+      {label:'SLA %', data:monthly.map(x=>{
+        const adj = FRT_VIOLATIONS.filter(r=>r[0]===x.m && !r[6]).length;
+        return r2((x.total-adj)/x.total*100);
+      }), backgroundColor:'#8A38F5', borderRadius:6, maxBarThickness:46}
+    ]},
+    options:{...COMMON_OPTS, plugins:{...COMMON_OPTS.plugins, legend:{display:false}}, scales:{...COMMON_OPTS.scales, y:{...COMMON_OPTS.scales.y, min:95, max:100.5}}}
+  });
+
+  document.getElementById('frt-tbody').innerHTML = rows.map(r=>{
+    const [month,date,num,recId,account,milestone,excluded] = r;
+    const link = `<a class="rec" target="_blank" rel="noopener" href="${SF_BASE}${recId}">${esc(num)}</a>`;
+    return `<tr><td>${month}</td><td>${fmtDate(date)}</td><td>${link}</td><td>${esc(account)}</td><td>${esc(milestone)}</td><td>${excluded?'<span class="pill excl">Excluded (invalid)</span>':'<span class="pill bad">Counted breach</span>'}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="small">No breaches this month.</td></tr>';
+}
+
+/* ============================================================
+   CLOSURE AGE (T1)
+   ============================================================ */
+function renderClosure(){
+  const el = document.getElementById('p-closure');
+  el.innerHTML = `
+    <div class="toolbar">
+      <div><div class="ch-title">Closure Age — Tier 1</div><div class="sub">FY26-27 YTD · Jira-excluded, Explorer-excluded</div></div>
+      <div>${monthSelect('closure')}</div>
+    </div>
+    <div id="closure-kpis"></div>
+    <div class="card" style="margin-top:14px">
+      <div class="ch-head"><div class="ch-title">Monthly average age (days)</div></div>
+      <div class="canwrap"><canvas id="closure-chart"></canvas></div>
+      <div class="small">July is a partial month (through Jul 16) — its average will keep shifting until the month closes.</div>
+    </div>
+    <div class="sect-h"><h2>Solved-days distribution (FY26-27 YTD)</h2></div>
+    <div class="card"><table><thead><tr><th>Solved days</th><th>Count</th><th>Avg age</th><th>% of cases</th></tr></thead>
+    <tbody>${CLOSURE_BUCKETS.map(b=>`<tr><td>${b.name}</td><td>${b.count}</td><td>${b.avg.toFixed(2)}</td><td>${r2(b.count/CLOSURE_OVERALL.n*100)}%</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td><b>${CLOSURE_OVERALL.n}</b></td><td><b>${CLOSURE_OVERALL.avg.toFixed(2)}</b></td><td><b>100.00%</b></td></tr></tbody></table></div>
+    <div class="note">P50/P75/P95 are interpolated from this bucketed distribution (Salesforce won't let this field be grouped by exact day), so treat them as close approximations rather than exact ranks. The average and monthly figures above are exact.<br>Per-case ticket rows aren't listed for this tab (1,569 cases YTD) — the distribution table covers every case in aggregate.</div>
+  `;
+  wireMonthSelect(el, 'closure', renderClosure);
+
+  const scope = ACTIVE_MONTH.closure==='All' ? CLOSURE_MONTHLY : CLOSURE_MONTHLY.filter(x=>x.m===ACTIVE_MONTH.closure);
+  const n = scope.reduce((s,x)=>s+x.n,0);
+  const avg = n ? r2(scope.reduce((s,x)=>s+x.n*x.avg,0)/n) : null;
+
+  document.getElementById('closure-kpis').innerHTML = `
+    <div class="grid kpis5">
+      <div class="card kpi"><div class="lab">Average</div><div class="val">${avg!=null?avg:'—'}</div><div class="tag ${avg<=CLOSURE_AVG_GOAL?'ok':'bad'}">goal ≤${CLOSURE_AVG_GOAL}</div></div>
+      <div class="card kpi"><div class="lab">P50 (approx)</div><div class="val">${ACTIVE_MONTH.closure==='All'?CLOSURE_OVERALL.p50:'—'}</div><div class="tag neu">median</div></div>
+      <div class="card kpi"><div class="lab">P75 (approx)</div><div class="val">${ACTIVE_MONTH.closure==='All'?CLOSURE_OVERALL.p75:'—'}</div><div class="tag ${CLOSURE_OVERALL.p75<=CLOSURE_P75_TARGET?'ok':'bad'}">target ≤${CLOSURE_P75_TARGET}</div></div>
+      <div class="card kpi"><div class="lab">P95 (approx)</div><div class="val">${ACTIVE_MONTH.closure==='All'?CLOSURE_OVERALL.p95:'—'}</div><div class="tag neu">long tail</div></div>
+      <div class="card kpi"><div class="lab">Cases counted</div><div class="val">${n}</div><div class="tag neu">T1 closed</div></div>
+    </div>
+  `;
+
+  if(CHARTS.closure) CHARTS.closure.destroy();
+  CHARTS.closure = new Chart(document.getElementById('closure-chart'), {
+    type:'line',
+    data:{labels:CLOSURE_MONTHLY.map(x=>x.m), datasets:[
+      {label:'Average age', data:CLOSURE_MONTHLY.map(x=>x.avg), borderColor:'#8A38F5', backgroundColor:'#8A38F5', borderWidth:3, pointRadius:4, pointHoverRadius:6, tension:.3, fill:false},
+      {label:'Goal '+CLOSURE_AVG_GOAL, data:CLOSURE_MONTHLY.map(()=>CLOSURE_AVG_GOAL), borderColor:'#B0F7BA', borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false},
+      {label:'P75 target '+CLOSURE_P75_TARGET, data:CLOSURE_MONTHLY.map(()=>CLOSURE_P75_TARGET), borderColor:'#899CFA', borderWidth:1.5, borderDash:[3,3], pointRadius:0, fill:false}
+    ]},
+    options:{...COMMON_OPTS, scales:{...COMMON_OPTS.scales, y:{...COMMON_OPTS.scales.y, title:{display:true,text:'Days',color:'#888',font:CHART_FONT}}}}
+  });
+}
+
+/* ============================================================
+   CHAT VOLUME
+   ============================================================ */
+function renderChatVol(){
+  const el = document.getElementById('p-chatvol');
+  el.innerHTML = `
+    <div class="toolbar">
+      <div><div class="ch-title">Chat Volume &amp; Deflection</div><div class="sub">FY26-27 YTD</div></div>
+      <div>${monthSelect('chatvol')}</div>
+    </div>
+    <div id="chatvol-kpis"></div>
+    <div class="card" style="margin-top:14px">
+      <div class="ch-head"><div class="ch-title">Monthly chat volume</div></div>
+      <div class="canwrap"><canvas id="chatvol-chart"></canvas></div>
+      <div class="small">"Converted" = chat led to a Salesforce case. "Solved in chat" = resolved without creating one.</div>
+    </div>
+    <div class="sect-h"><h2>Monthly breakdown</h2></div>
+    <div class="card"><table><thead><tr><th>Month</th><th>Total chats</th><th>Converted to case</th><th>Solved in chat</th><th>Solved %</th></tr></thead>
+    <tbody>${CHAT_VOL_MONTHLY.map(x=>`<tr><td>${x.m}</td><td>${x.total}</td><td>${x.converted}</td><td>${x.total-x.converted}</td><td>${r2((x.total-x.converted)/x.total*100)}%</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td><b>${CHAT_VOL_OVERALL.total}</b></td><td><b>${CHAT_VOL_OVERALL.converted}</b></td><td><b>${CHAT_VOL_OVERALL.total-CHAT_VOL_OVERALL.converted}</b></td><td><b>${r2((CHAT_VOL_OVERALL.total-CHAT_VOL_OVERALL.converted)/CHAT_VOL_OVERALL.total*100)}%</b></td></tr></tbody></table></div>
+    <div class="note">This tab is aggregate-only (no per-chat ticket rows) — MessagingSession volume this period is ~1,700 records.</div>
+  `;
+  wireMonthSelect(el, 'chatvol', renderChatVol);
+
+  const scope = ACTIVE_MONTH.chatvol==='All' ? CHAT_VOL_MONTHLY : CHAT_VOL_MONTHLY.filter(x=>x.m===ACTIVE_MONTH.chatvol);
+  const total = scope.reduce((s,x)=>s+x.total,0);
+  const converted = scope.reduce((s,x)=>s+x.converted,0);
+  const solvedPct = total ? r2((total-converted)/total*100) : null;
+
+  document.getElementById('chatvol-kpis').innerHTML = `
+    <div class="grid kpis">
+      <div class="card kpi"><div class="lab">Total chats</div><div class="val">${total}</div><div class="tag neu">${ACTIVE_MONTH.chatvol==='All'?'FY26-27 YTD':ACTIVE_MONTH.chatvol+' 2026'}</div></div>
+      <div class="card kpi"><div class="lab">Converted to case</div><div class="val">${converted}</div><div class="tag neu">${total?r2(converted/total*100):'—'}%</div></div>
+      <div class="card kpi"><div class="lab">Solved in chat</div><div class="val">${total-converted}</div><div class="tag ok">${solvedPct}%</div></div>
+      <div class="card kpi"><div class="lab">Deflection rate</div><div class="val">${solvedPct!=null?solvedPct+'%':'—'}</div><div class="tag neu">no case created</div></div>
+    </div>
+  `;
+
+  if(CHARTS.chatvol) CHARTS.chatvol.destroy();
+  CHARTS.chatvol = new Chart(document.getElementById('chatvol-chart'), {
+    type:'bar',
+    data:{labels:CHAT_VOL_MONTHLY.map(x=>x.m), datasets:[
+      {label:'Solved in chat', data:CHAT_VOL_MONTHLY.map(x=>x.total-x.converted), backgroundColor:'#B0F7BA', borderRadius:4, stack:'s'},
+      {label:'Converted to case', data:CHAT_VOL_MONTHLY.map(x=>x.converted), backgroundColor:'#8A38F5', borderRadius:4, stack:'s'}
+    ]},
+    options:{...COMMON_OPTS, scales:{...COMMON_OPTS.scales, x:{...COMMON_OPTS.scales.x, stacked:true}, y:{...COMMON_OPTS.scales.y, stacked:true}}}
+  });
+}
+
+/* ============================================================
+   TABS + INIT
+   ============================================================ */
+document.getElementById('tabbar').addEventListener('click', e=>{
+  const btn = e.target.closest('.tab'); if(!btn) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.p).classList.add('active');
+});
+
+function renderAll(){
+  renderOverview();
+  renderCsatTab('p-casecsat', {
+    key:'casecsat', title:'Case CSAT', target:CASE_CSAT_TARGET, scoreLabel:'CSAT',
+    numLabel:'Case #', rows:CASE_CSAT_ROWS, monthly:CASE_CSAT_MONTHLY,
+    satScore:{'Very Satisfied':5,'Satisfied':4,'Neutral':3,'Dissatisfied':2,'Very Dissatisfied':1}
+  });
+  renderCsatTab('p-chatcsat', {
+    key:'chatcsat', title:'Chat CSAT', target:CHAT_CSAT_TARGET, scoreLabel:'Chat CSAT',
+    numLabel:'Chat #', rows:CHAT_CSAT_ROWS, monthly:CHAT_CSAT_MONTHLY,
+    satScore:{}, rowNote:'Rows shown are Feb–Apr (complete, 53 responses). May–Jul rows aren\'t individually listed yet — those months\' KPI figures above are still exact, from a separate verified aggregate pull.'
+  });
+  renderFrt();
+  renderClosure();
+  renderChatVol();
+}
+
+/* ============================================================
+   LIVE DATA — Google Sign-In (OAuth) + Google Drive.
+   Every Contentstack Google account with folder access can sign in here;
+   a scheduled job keeps writing a fresh JSON snapshot to the shared Drive
+   folder every 5 minutes, and this page reads it directly — no manual
+   pushing to any external system required.
+   Until CONFIG.GOOGLE_CLIENT_ID is filled in (one-time setup, see
+   GOOGLE_OAUTH_SETUP.md), this stays fully dormant and the page just
+   shows the verified baseline snapshot above, exactly as before.
+   ============================================================ */
+let GIS_TOKEN_CLIENT = null;
+let ACCESS_TOKEN = null;
+let AUTO_REFRESH_TIMER = null;
+
+function renderAuthBox(){
+  const box = document.getElementById('auth-box');
+  if(!box) return;
+  if(!CONFIG.GOOGLE_CLIENT_ID){
+    box.innerHTML = `<div class="small" style="text-align:right">Live refresh not yet configured<br>(one-time Google sign-in setup pending)</div>`;
+    return;
+  }
+  if(ACCESS_TOKEN){
+    box.innerHTML = `<div class="small" style="text-align:right">Signed in — live data enabled<br><span style="cursor:pointer;color:var(--am);font-weight:600" onclick="signOut()">Sign out</span></div>`;
+  } else {
+    box.innerHTML = `<button style="border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--am);font-family:inherit;font-weight:600;font-size:13px;padding:8px 14px;cursor:pointer" onclick="signIn()">Sign in with Google to enable live data</button>`;
+  }
+}
+
+function ensureTokenClient(){
+  if(GIS_TOKEN_CLIENT || !window.google || !window.google.accounts || !CONFIG.GOOGLE_CLIENT_ID) return;
+  GIS_TOKEN_CLIENT = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.GOOGLE_CLIENT_ID,
+    scope: CONFIG.DRIVE_SCOPE,
+    callback: async (resp) => {
+      if(resp.error){ console.warn('Google sign-in error:', resp); return; }
+      ACCESS_TOKEN = resp.access_token;
+      renderAuthBox();
+      await refreshFromDrive();
+      if(!AUTO_REFRESH_TIMER) AUTO_REFRESH_TIMER = setInterval(silentRefresh, CONFIG.REFRESH_MS);
+    }
+  });
+}
+
+function signIn(){
+  ensureTokenClient();
+  if(!GIS_TOKEN_CLIENT) return;
+  GIS_TOKEN_CLIENT.requestAccessToken({ prompt: 'consent' });
+}
+
+function signOut(){
+  if(ACCESS_TOKEN && window.google && window.google.accounts){
+    google.accounts.oauth2.revoke(ACCESS_TOKEN, ()=>{});
+  }
+  ACCESS_TOKEN = null;
+  if(AUTO_REFRESH_TIMER){ clearInterval(AUTO_REFRESH_TIMER); AUTO_REFRESH_TIMER = null; }
+  renderAuthBox();
+  const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
+  dot.className = 'status-dot stale';
+  txt.textContent = 'Showing verified snapshot pulled ' + fmtDate(PULLED_AT) + ' (signed out — live auto-refresh paused)';
+}
+
+// Re-requests a token with no prompt — succeeds silently as long as the
+// user's Google session/consent from signIn() is still valid, so the page
+// keeps refreshing every 5 minutes without asking the user to click again.
+function silentRefresh(){
+  if(!GIS_TOKEN_CLIENT) return;
+  GIS_TOKEN_CLIENT.requestAccessToken({ prompt: '' });
+}
+
+async function refreshFromDrive(){
+  const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text'), banner = document.getElementById('mode-banner');
+  if(!ACCESS_TOKEN) return;
+  try{
+    const q = encodeURIComponent(`'${CONFIG.DRIVE_FOLDER_ID}' in parents and name contains '${CONFIG.SNAPSHOT_NAME_PREFIX}' and trashed=false`);
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=1&fields=files(id,name,createdTime)`;
+    const listResp = await fetch(listUrl, { headers:{ Authorization:'Bearer '+ACCESS_TOKEN } });
+    if(!listResp.ok) throw new Error('Drive list failed (HTTP '+listResp.status+')');
+    const listData = await listResp.json();
+    const file = listData.files && listData.files[0];
+    if(!file) throw new Error('no snapshot file found in the Drive folder yet');
+    const fileResp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers:{ Authorization:'Bearer '+ACCESS_TOKEN } });
+    if(!fileResp.ok) throw new Error('Drive file fetch failed (HTTP '+fileResp.status+')');
+    const snap = await fileResp.json();
+    applySnapshot(snap);
+    dot.className = 'status-dot live';
+    const nowUtc = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'UTC'});
+    txt.textContent = 'Live — last refreshed ' + nowUtc + ' UTC (source snapshot pulled ' + fmtDate(snap.pulledAt || PULLED_AT) + ')';
+    banner.textContent = 'Connected to the live Google Drive snapshot — refreshing automatically every 5 minutes.';
+  } catch(err){
+    console.warn('Live refresh failed, keeping last known good data:', err);
+    dot.className = 'status-dot stale';
+    txt.textContent = 'Live refresh failed (' + err.message + ') — showing last known good data pulled ' + fmtDate(PULLED_AT);
+  }
+}
+
+function applySnapshot(snap){
+  if(!snap || !snap.caseCsat || !snap.chatCsat || !snap.frt || !snap.closure || !snap.chatVol){
+    console.warn('Snapshot missing expected sections — ignoring and keeping last known good data.');
+    return;
+  }
+  PULLED_AT = snap.pulledAt || PULLED_AT;
+  CASE_CSAT_MONTHLY = snap.caseCsat.monthly; CASE_CSAT_OVERALL = snap.caseCsat.overall; CASE_CSAT_ROWS = snap.caseCsat.rows;
+  CHAT_CSAT_MONTHLY = snap.chatCsat.monthly; CHAT_CSAT_OVERALL = snap.chatCsat.overall; CHAT_CSAT_ROWS = snap.chatCsat.rows;
+  FRT_MONTHLY = snap.frt.monthly; FRT_OVERALL = snap.frt.overall; FRT_VIOLATIONS = snap.frt.violations;
+  CLOSURE_MONTHLY = snap.closure.monthly; CLOSURE_OVERALL = snap.closure.overall; CLOSURE_BUCKETS = snap.closure.buckets;
+  CHAT_VOL_MONTHLY = snap.chatVol.monthly; CHAT_VOL_OVERALL = snap.chatVol.overall;
+  renderAll();
+}
+
+renderAll();
+renderAuthBox();
+(function initStatus(){
+  const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
+  dot.className = 'status-dot stale';
+  txt.textContent = CONFIG.GOOGLE_CLIENT_ID
+    ? 'Showing verified snapshot pulled ' + fmtDate(PULLED_AT) + ' — sign in above to switch to live data'
+    : 'Showing verified snapshot pulled ' + fmtDate(PULLED_AT) + ' (live auto-refresh not yet connected — see setup notes)';
+})();
+</script>
+</body>
+</html>
